@@ -1,5 +1,5 @@
 {
-  "name": "meditrack-backend",
+  "name": "purple-theme-website",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -13,7 +13,6 @@
     "body-parser": "^1.20.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "groq": "^3.70.0",
     "mongoose": "^8.9.5",
     "multer": "^1.4.5-lts.1"
   }
