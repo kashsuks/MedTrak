@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login/Signup</title>
+    <title>MedTrak - Home</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
-        <!-- Login Form -->
+        <!-- Login/Signup Form (Initially visible if not logged in) -->
         <div class="form-box" id="login-form-box">
             <h2>Login</h2>
             <form id="login-form">
@@ -19,7 +19,6 @@
             <p>Don't have an account? <a href="javascript:void(0);" id="signup-link">Sign Up</a></p>
         </div>
 
-        <!-- Signup Form -->
         <div class="form-box" id="signup-form-box" style="display: none;">
             <h2>Sign Up</h2>
             <form id="signup-form">
@@ -29,8 +28,127 @@
             </form>
             <p>Already have an account? <a href="javascript:void(0);" id="login-link">Login</a></p>
         </div>
+
+        <!-- Home Content (Initially hidden) -->
+        <div id="home-content" class="home-content" style="display: none;">
+            <div class="navbar">
+                <h2 id="greeting">Hello, {username}!</h2>
+            </div>
+
+            <div class="data-section">
+                <h3>Past Medication Data</h3>
+                <div id="past-data" class="data-list">
+                    <!-- Dummy past data will go here -->
+                </div>
+            </div>
+
+            <div class="logout">
+                <button id="logout-btn">Logout</button>
+            </div>
+        </div>
     </div>
 
-    <script src="app.js"></script>
+    <script>
+        let authToken = '';
+
+        // Handle login form submission
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            fetch('http://localhost:5000/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.token) {
+                    authToken = data.token;
+                    showHomePage(username);
+                } else {
+                    alert(data.message || 'Login failed');
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+        });
+
+        // Handle signup form submission
+        document.getElementById('signup-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('signup-username').value;
+            const password = document.getElementById('signup-password').value;
+
+            fetch('http://localhost:5000/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.message === "User registered successfully") {
+                    alert("Sign-up successful! Please login.");
+                    document.getElementById('signup-form-box').style.display = 'none';
+                    document.getElementById('login-form-box').style.display = 'block';
+                } else {
+                    alert(data.message || 'Sign-up failed');
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+        });
+
+        // Show home page after successful login
+        function showHomePage(username) {
+            document.getElementById('login-form-box').style.display = 'none';
+            document.getElementById('signup-form-box').style.display = 'none';
+            document.getElementById('home-content').style.display = 'block';
+            document.getElementById('greeting').innerText = `Hello, ${username}!`;
+            loadPastData();
+        }
+
+        // Fetch past data after login
+        function loadPastData() {
+            fetch('http://localhost:5000/medications', {
+                method: 'GET',
+                headers: { 'Authorization': authToken }
+            })
+            .then(res => res.json())
+            .then(data => {
+                const dataList = document.getElementById('past-data');
+                dataList.innerHTML = '';
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    div.classList.add('data-item');
+                    div.innerHTML = `
+                        <h4>${item.medication}</h4>
+                        <p>Date Taken: ${item.dateTaken}</p>
+                        <p>Dosage: ${item.dosage}</p>
+                    `;
+                    dataList.appendChild(div);
+                });
+            });
+        }
+
+        // Handle logout
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            authToken = '';
+            document.getElementById('home-content').style.display = 'none';
+            document.getElementById('login-form-box').style.display = 'block';
+        });
+
+        // Toggle between login and signup forms
+        document.getElementById('signup-link').addEventListener('click', () => {
+            document.getElementById('login-form-box').style.display = 'none';
+            document.getElementById('signup-form-box').style.display = 'block';
+        });
+
+        document.getElementById('login-link').addEventListener('click', () => {
+            document.getElementById('signup-form-box').style.display = 'none';
+            document.getElementById('login-form-box').style.display = 'block';
+        });
+    </script>
 </body>
 </html>

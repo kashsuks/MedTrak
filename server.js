@@ -1,64 +1,109 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const cors = require('cors');
 
+// Initialize Express
 const app = express();
-app.use(express.json());
+
+// Middleware
 app.use(cors());
+app.use(express.json());
 
-mongoose.connect('mongodb://localhost:27017/userDB', { useNewUrlParser: true, useUnifiedTopology: true });
+// MongoDB connection
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log("Connected to MongoDB"))
+    .catch((err) => console.log(err));
 
-const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
+// User and Medication Models
+const User = mongoose.model('User', new mongoose.Schema({
+    username: { type: String, unique: true, required: true },
     password: { type: String, required: true }
-});
+}));
 
-const User = mongoose.model('User', userSchema);
+const Medication = mongoose.model('Medication', new mongoose.Schema({
+    username: { type: String, required: true },
+    medication: { type: String, required: true },
+    dateTaken: { type: String, required: true },
+    dosage: { type: String, required: true }
+}));
 
-app.post('/api/signup', async (req, res) => {
+// API to register (Sign up)
+app.post('/signup', async (req, res) => {
     const { username, password } = req.body;
 
     try {
-        // Check if username already exists
-        const existingUser = await User.findOne({ username });
-        if (existingUser) {
-            return res.status(400).json({ success: false, message: 'Username already taken' });
+        // Check if the user exists
+        const userExists = await User.findOne({ username });
+        if (userExists) {
+            return res.status(400).json({ message: "Username already exists" });
         }
 
-        // Hash the password
+        // Hash the password before saving
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Save user
         const newUser = new User({ username, password: hashedPassword });
         await newUser.save();
 
-        res.status(200).json({ success: true, message: 'User registered successfully' });
+        // Send response
+        res.status(201).json({ message: "User registered successfully" });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        res.status(500).json({ message: "Server error" });
     }
 });
 
-app.post('/api/login', async (req, res) => {
+// API to login (Authenticate)
+app.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
     try {
+        // Find user
         const user = await User.findOne({ username });
         if (!user) {
-            return res.status(400).json({ success: false, message: 'User not found' });
+            return res.status(400).json({ message: "Invalid username or password" });
         }
 
+        // Compare passwords
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(400).json({ success: false, message: 'Invalid password' });
+            return res.status(400).json({ message: "Invalid username or password" });
         }
 
-        res.status(200).json({ success: true, message: 'Login successful' });
+        // Generate JWT token
+        const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+        // Send response with token
+        res.json({ token });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        res.status(500).json({ message: "Server error" });
     }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// API to fetch past medication data
+app.get('/medications', async (req, res) => {
+    const token = req.headers.authorization;
+
+    if (!token) {
+        return res.status(403).json({ message: "No token provided" });
+    }
+
+    try {
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const username = decoded.username;
+
+        // Fetch medications from the database
+        const medications = await Medication.find({ username });
+        res.json(medications);
+    } catch (error) {
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Start the server
+app.listen(5000, () => {
+    console.log("Server running on port 5000");
 });
